@@ -88,7 +88,8 @@ def index():
         'font-family:Lato, sans-serif;font-size:18px;font-weight:600;height:56px;justify-content:center;text-decoration:none;width:276px">' \
         '<svg xmlns="http://www.w3.org/2000/svg" style="height:24px;width:24px;margin-right:12px" viewBox="0 0 122.8 122.8"><path d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9zm6.5 0c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z" fill="#e01e5a"></path><path d="M45.2 25.8c-7.1 0-12.9-5.8-12.9-12.9S38.1 0 45.2 0s12.9 5.8 12.9 12.9v12.9H45.2zm0 6.5c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H12.9C5.8 58.1 0 52.3 0 45.2s5.8-12.9 12.9-12.9h32.3z" fill="#36c5f0"></path><path d="M97 45.2c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.9 12.9H97V45.2zm-6.5 0c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V12.9C64.7 5.8 70.5 0 77.6 0s12.9 5.8 12.9 12.9v32.3z" fill="#2eb67d"></path><path d="M77.6 97c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9-12.9-5.8-12.9-12.9V97h12.9zm0-6.5c-7.1 0-12.9-5.8-12.9-12.9s5.8-12.9 12.9-12.9h32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H77.6z" fill="#ecb22e"></path></svg>' \
         'Add to Slack</a>'
-    slack_status_menu = f'<a href="/get_slack_status_text">get_slack_status_text</a> | ' \
+    slack_status_menu = f'<a href="/get_slack_status_text">get_slack_status_text</a>' \
+        f'<br/><br/>' \
         f'<a href="/set_slack_status_text">set_slack_status_text</a>'
     show_slack_button = ''
     if session.get('SLACK_USER_TOKEN') is None:
@@ -102,8 +103,9 @@ def index():
             show_slack_button = slack_status_menu
 
     return f'<h2>Hi {spotify.me()["display_name"]}, ' \
-           f'<small><a href="/sign_out">[sign out]<a/></small></h2>' \
-           f'<a href="/currently_playing">currently playing</a> | ' \
+        f'<small><a href="/sign_out">[sign out]<a/></small></h2>' \
+        f'<a href="/currently_playing">currently playing</a>' \
+        f'<br/><br/>' \
         f'<a href="/current_user">current_user</a>' \
         f'<br/><br/>' \
         f'{show_slack_button}' \
@@ -190,8 +192,12 @@ def get_slack_status_text():
     assert response["ok"]
     slack_status_text = response.get('profile').get('status_text')
     if (not slack_status_text is None) and (len(slack_status_text) > 0):
-        return f'Read Slack Status: {slack_status_text}<br/><br/><a href="/">Return</a>'
-    return 'No Slack status currently set.<br/><br/><a href="/">Return</a>'
+        return f'Fetched Slack Status:'\
+            f'<br/><br/>' \
+            f'{slack_status_text}'\
+            '<br/><br/><a href="/">Return</a>'
+    return 'No Slack status currently set.'\
+        '<br/><br/><a href="/">Return</a>'
 
 
 @app.route('/set_slack_status_text')
@@ -210,7 +216,10 @@ def set_slack_status_text():
             assert response["ok"]
             slack_status_text = response.get('profile').get('status_text')
             if (not slack_status_text is None) and (len(slack_status_text) > 0):
-                return f'Wrote Slack Status: {slack_status_text}<br/><br/><a href="/">Return</a>'
+                return f'Wrote Slack Status:'\
+                    f'<br/><br/>' \
+                    f'{slack_status_text}'\
+                    '<br/><br/><a href="/">Return</a>'
         else:
             # clear if paused
             response = client.users_profile_set(
@@ -220,9 +229,9 @@ def set_slack_status_text():
                 }
             )
             assert response["ok"]
-            return 'Track may be paused. Clearing Slack status.<br/><br/><a href="/">Return</a>'
+            return 'Track may be paused. Cleared Slack status.<br/><br/><a href="/">Return</a>'
     # don't clear status if no track was playing AND not paused
-    return 'No track currently playing. No Slack status currently set.<br/><br/><a href="/">Return</a>'
+    return 'No track currently playing. Not changing Slack status.<br/><br/><a href="/">Return</a>'
 
 
 '''
