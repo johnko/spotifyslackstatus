@@ -1,0 +1,12 @@
+_metadata:
+  major_version: 1
+  minor_version: 1
+display_information:
+  name: SpotifySlackStatus
+  description: Sets your Slack status to the currently playing song / track from Spotify
+  background_color: "#5dcd61"
+oauth_config:
+  scopes:
+    user:
+      - users.profile:read
+      - users.profile:write
