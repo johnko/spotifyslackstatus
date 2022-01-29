@@ -198,26 +198,30 @@ def get_slack_status_text():
 def set_slack_status_text():
     client = WebClient(token=session['SLACK_USER_TOKEN'])
     track = get_current_track()
-    artist_title = f"{track['item']['artists'][0]['name']} - {track['item']['name']}"
-    if (not artist_title is None) and (len(artist_title) > 0) and (track['is_playing']):
-        response = client.users_profile_set(
-            profile={
-                'status_text': artist_title,
-                'status_emoji': ':musical_note:',
-            }
-        )
-        assert response["ok"]
-        slack_status_text = response.get('profile').get('status_text')
-        if (not slack_status_text is None) and (len(slack_status_text) > 0):
-            return f'Wrote Slack Status: {slack_status_text}<br/><br/><a href="/">Return</a>'
-    else:
-        response = client.users_profile_set(
-            profile={
-                'status_text': '',
-                'status_emoji': '',
-            }
-        )
-        assert response["ok"]
+    if not track is None:
+        artist_title = f"{track['item']['artists'][0]['name']} - {track['item']['name']}"
+        if (not artist_title is None) and (len(artist_title) > 0) and (track['is_playing']):
+            response = client.users_profile_set(
+                profile={
+                    'status_text': artist_title,
+                    'status_emoji': ':musical_note:',
+                }
+            )
+            assert response["ok"]
+            slack_status_text = response.get('profile').get('status_text')
+            if (not slack_status_text is None) and (len(slack_status_text) > 0):
+                return f'Wrote Slack Status: {slack_status_text}<br/><br/><a href="/">Return</a>'
+        else:
+            # clear if paused
+            response = client.users_profile_set(
+                profile={
+                    'status_text': '',
+                    'status_emoji': '',
+                }
+            )
+            assert response["ok"]
+            return 'Track may be paused. Clearing Slack status.<br/><br/><a href="/">Return</a>'
+    # don't clear status if no track was playing AND not paused
     return 'No track currently playing. No Slack status currently set.<br/><br/><a href="/">Return</a>'
 
 
