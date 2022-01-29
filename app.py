@@ -174,7 +174,7 @@ def post_install():
         'authed_user').get('access_token')
 
     # Don't forget to let the user know that OAuth has succeeded!
-    return 'App installed to Slack!<br/><br/><a href="/">Return</a>'
+    return 'SpotifySlackStatus app successfully installed to Slack!<br/><br/><a href="/">Return</a>'
 
 
 @app.route('/get_slack_status_text')
