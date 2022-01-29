@@ -70,12 +70,12 @@ def index():
     if not auth_manager.validate_token(cache_handler.get_cached_token()):
         # Step 2. Display sign in link when no token
         auth_url = auth_manager.get_authorize_url()
-        return f'<h2>SpotifySlackStatus</h2><a href="{auth_url}">'\
-            '<button id="login-button" data-testid="login-button" class="Button-qlcn5g-0 frUdWl" '\
-            'style="cursor: pointer;box-sizing: border-box;font-family: spotify-circular, Helvetica, Arial, sans-serif;-webkit-tap-highlight-color: transparent;font-weight: 700;background-color: transparent;border: 0px;border-radius: 500px;display: inline-block;position: relative;text-align: center;text-decoration: none;touch-action: manipulation;transition-duration: 33ms;transition-property: background-color, border-color, color, box-shadow, filter, transform;user-select: none;vertical-align: middle;transform: translate3d(0px, 0px, 0px);padding: 0px;align-self: center;">'\
-            '<div class="ButtonInner-sc-14ud5tc-0 lbsIMA encore-bright-accent-set" '\
-            'style="position: relative;background-color: var(--background-base,#1ed760);color: var(--text-base,#000000);border-radius: 500px;font-size: inherit;padding: 14px 32px;">'\
-            '<p class="Type__TypeElement-goli3j-0 dmuHFl sc-dkPtRN giKhHg" style="text-transform: uppercase;box-sizing: border-box;font-family: spotify-circular, Helvetica, Arial, sans-serif;-webkit-tap-highlight-color: transparent;margin-top: 0px;margin-bottom: 0px;color: inherit;font-weight: 700;">'\
+        return f'<h2>SpotifySlackStatus</h2><a href="{auth_url}">' \
+            '<button id="login-button" data-testid="login-button" class="Button-qlcn5g-0 frUdWl" ' \
+            'style="cursor: pointer;box-sizing: border-box;font-family: spotify-circular, Helvetica, Arial, sans-serif;-webkit-tap-highlight-color: transparent;font-weight: 700;background-color: transparent;border: 0px;border-radius: 500px;display: inline-block;position: relative;text-align: center;text-decoration: none;touch-action: manipulation;transition-duration: 33ms;transition-property: background-color, border-color, color, box-shadow, filter, transform;user-select: none;vertical-align: middle;transform: translate3d(0px, 0px, 0px);padding: 0px;align-self: center;">' \
+            '<div class="ButtonInner-sc-14ud5tc-0 lbsIMA encore-bright-accent-set" ' \
+            'style="position: relative;background-color: var(--background-base,#1ed760);color: var(--text-base,#000000);border-radius: 500px;font-size: inherit;padding: 14px 32px;">' \
+            '<p class="Type__TypeElement-goli3j-0 dmuHFl sc-dkPtRN giKhHg" style="text-transform: uppercase;box-sizing: border-box;font-family: spotify-circular, Helvetica, Arial, sans-serif;-webkit-tap-highlight-color: transparent;margin-top: 0px;margin-bottom: 0px;color: inherit;font-weight: 700;">' \
             'Connect Spotify</p></div></button></a>'
 
     # Step 4. Signed in, display data
@@ -139,8 +139,10 @@ def currently_playing():
     track = get_current_track()
     if not track is None:
         if track['is_playing']:
-            return f'{track}<br/><br/><a href="/">Return</a>'
-    return 'No track currently playing.<br/><br/><a href="/">Return</a>'
+            return f'{track}' \
+                '<br/><br/><a href="/">Return</a>'
+    return 'No track currently playing.' \
+        '<br/><br/><a href="/">Return</a>'
 
 
 @app.route('/current_user')
@@ -152,7 +154,8 @@ def current_user():
         return redirect('/')
     spotify = spotipy.Spotify(auth_manager=auth_manager)
     user = spotify.current_user()
-    return f'{user}<br/><br/><a href="/">Return</a>'
+    return f'{user}' \
+        '<br/><br/><a href="/">Return</a>'
 
 
 @app.route("/slack/oauth_redirect", methods=["GET"])
@@ -166,23 +169,28 @@ def post_install():
     # Retrieve the auth code from the request params
     code_param = request.args['code']
 
-    # An empty string is a valid token for this request
-    client = WebClient()
+    if not code_param is None:
+        # An empty string is a valid token for this request
+        client = WebClient()
 
-    # Request the auth tokens from Slack
-    response = client.oauth_v2_access(
-        client_id=slack_client_id,
-        client_secret=slack_client_secret,
-        code=code_param
-    )
+        # Request the auth tokens from Slack
+        response = client.oauth_v2_access(
+            client_id=slack_client_id,
+            client_secret=slack_client_secret,
+            code=code_param
+        )
 
-    # Save the bot token to an environmental variable or to your data store
-    # for later use
-    session["SLACK_USER_TOKEN"] = response.get(
-        'authed_user').get('access_token')
+        # Save the bot token to an environmental variable or to your data store
+        # for later use
+        session["SLACK_USER_TOKEN"] = response.get(
+            'authed_user').get('access_token')
 
-    # Don't forget to let the user know that OAuth has succeeded!
-    return 'SpotifySlackStatus app successfully installed to Slack!<br/><br/><a href="/">Return</a>'
+        if not session["SLACK_USER_TOKEN"] is None:
+            # Don't forget to let the user know that OAuth has succeeded!
+            return 'SpotifySlackStatus app successfully installed to Slack!' \
+                '<br/><br/><a href="/">Return</a>'
+    return 'Error installing SpotifySlackStatus app to Slack...' \
+        '<br/><br/><a href="/">Return</a>'
 
 
 @app.route('/get_slack_status_text')
@@ -192,11 +200,11 @@ def get_slack_status_text():
     assert response["ok"]
     slack_status_text = response.get('profile').get('status_text')
     if (not slack_status_text is None) and (len(slack_status_text) > 0):
-        return f'Fetched Slack Status:'\
+        return f'Retrieved Slack Status:' \
             f'<br/><br/>' \
-            f'{slack_status_text}'\
+            f'{slack_status_text}' \
             '<br/><br/><a href="/">Return</a>'
-    return 'No Slack status currently set.'\
+    return 'No Slack status currently set.' \
         '<br/><br/><a href="/">Return</a>'
 
 
@@ -216,9 +224,9 @@ def set_slack_status_text():
             assert response["ok"]
             slack_status_text = response.get('profile').get('status_text')
             if (not slack_status_text is None) and (len(slack_status_text) > 0):
-                return f'Wrote Slack Status:'\
+                return f'Wrote Slack Status:' \
                     f'<br/><br/>' \
-                    f'{slack_status_text}'\
+                    f'{slack_status_text}' \
                     '<br/><br/><a href="/">Return</a>'
         else:
             # clear if paused
@@ -229,9 +237,11 @@ def set_slack_status_text():
                 }
             )
             assert response["ok"]
-            return 'Track may be paused. Cleared Slack status.<br/><br/><a href="/">Return</a>'
+            return 'Track may be paused. Cleared Slack status.' \
+                '<br/><br/><a href="/">Return</a>'
     # don't clear status if no track was playing AND not paused
-    return 'No track currently playing. Not changing Slack status.<br/><br/><a href="/">Return</a>'
+    return 'No track currently playing. Not changing Slack status.' \
+        '<br/><br/><a href="/">Return</a>'
 
 
 '''
