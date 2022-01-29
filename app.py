@@ -70,7 +70,13 @@ def index():
     if not auth_manager.validate_token(cache_handler.get_cached_token()):
         # Step 2. Display sign in link when no token
         auth_url = auth_manager.get_authorize_url()
-        return f'<h2><a href="{auth_url}"><button id="login-button" data-testid="login-button" class="Button-qlcn5g-0 frUdWl"><div class="ButtonInner-sc-14ud5tc-0 lbsIMA encore-bright-accent-set"><p class="Type__TypeElement-goli3j-0 dmuHFl sc-dkPtRN giKhHg">Connect Spotify</p></div><div class="ButtonFocus-sc-2hq6ey-0 eiuQDg"></div></button></a></h2>'
+        return f'<h2>SpotifySlackStatus</h2><a href="{auth_url}">'\
+            '<button id="login-button" data-testid="login-button" class="Button-qlcn5g-0 frUdWl" '\
+            'style="cursor: pointer;box-sizing: border-box;font-family: spotify-circular, Helvetica, Arial, sans-serif;-webkit-tap-highlight-color: transparent;font-weight: 700;background-color: transparent;border: 0px;border-radius: 500px;display: inline-block;position: relative;text-align: center;text-decoration: none;touch-action: manipulation;transition-duration: 33ms;transition-property: background-color, border-color, color, box-shadow, filter, transform;user-select: none;vertical-align: middle;transform: translate3d(0px, 0px, 0px);padding: 0px;align-self: center;">'\
+            '<div class="ButtonInner-sc-14ud5tc-0 lbsIMA encore-bright-accent-set" '\
+            'style="position: relative;background-color: var(--background-base,#1ed760);color: var(--text-base,#000000);border-radius: 500px;font-size: inherit;padding: 14px 32px;">'\
+            '<p class="Type__TypeElement-goli3j-0 dmuHFl sc-dkPtRN giKhHg" style="text-transform: uppercase;box-sizing: border-box;font-family: spotify-circular, Helvetica, Arial, sans-serif;-webkit-tap-highlight-color: transparent;margin-top: 0px;margin-bottom: 0px;color: inherit;font-weight: 700;">'\
+            'Connect Spotify</p></div></button></a>'
 
     # Step 4. Signed in, display data
     spotify = spotipy.Spotify(auth_manager=auth_manager)
