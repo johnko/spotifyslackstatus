@@ -174,19 +174,22 @@ def post_install():
     assert session['state'] == request.args['state']
 
     # Retrieve the auth code from the request params
-    code_param = request.args['code']
+    code_param = request.args.get('code')
 
     if not code_param is None:
         # An empty string is a valid token for this request
         client = WebClient()
 
-        # Request the auth tokens from Slack
-        response = client.oauth_v2_access(
-            client_id=slack_client_id,
-            client_secret=slack_client_secret,
-            code=code_param
-        )
-
+        try:
+            # Request the auth tokens from Slack
+            response = client.oauth_v2_access(
+                client_id=slack_client_id,
+                client_secret=slack_client_secret,
+                code=code_param
+            )
+        except:
+            return 'Error installing SpotifySlackStatus app to Slack...' \
+                '<br/><br/><a href="/">Return</a>'
         # Save the bot token to an environmental variable or to your data store
         # for later use
         session["SLACK_USER_TOKEN"] = response.get(
