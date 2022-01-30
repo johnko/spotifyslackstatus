@@ -1,4 +1,12 @@
 """
+Modified from
+
+    https://github.com/plamere/spotipy/blob/master/examples/app.py
+    MIT Licensed https://github.com/plamere/spotipy/blob/master/LICENSE.md
+
+    https://github.com/slackapi/python-slack-sdk/blob/main/docs/installation/index.html
+    MIT Licensed https://github.com/slackapi/python-slack-sdk/blob/main/LICENSE
+
 Prerequisites
 
     pip3 install spotipy Flask Flask-Session
@@ -138,9 +146,8 @@ def get_current_track():
 def currently_playing():
     track = get_current_track()
     if not track is None:
-        if track['is_playing']:
-            return f'{track}' \
-                '<br/><br/><a href="/">Return</a>'
+        return f'{track}' \
+            '<br/><br/><a href="/">Return</a>'
     return 'No track currently playing.' \
         '<br/><br/><a href="/">Return</a>'
 
@@ -193,17 +200,42 @@ def post_install():
         '<br/><br/><a href="/">Return</a>'
 
 
+def get_saved_status():
+    original_status_emoji = session.get('slack_status_emoji')
+    original_status_text = session.get('slack_status_text')
+    saved_status = ''
+    if (not original_status_emoji is None) or (not original_status_text is None):
+        if original_status_emoji is None:
+            original_status_emoji = ''
+        if original_status_text is None:
+            original_status_text = ''
+        saved_status = f'Original Slack Status (before SpotifySlackStatus):' \
+            '<br/><br/>' \
+            f"{original_status_emoji}" \
+            f'<br/>' \
+            f"{original_status_text}" \
+            '<br/><br/>'
+    return saved_status
+
+
 @app.route('/get_slack_status_text')
 def get_slack_status_text():
     client = WebClient(token=session['SLACK_USER_TOKEN'])
     response = client.users_profile_get()
     assert response["ok"]
+    slack_status_emoji = response.get('profile').get('status_emoji')
     slack_status_text = response.get('profile').get('status_text')
-    if (not slack_status_text is None) and (len(slack_status_text) > 0):
+    saved_status = get_saved_status()
+
+    if ((not slack_status_emoji is None) and (len(slack_status_emoji) > 0)) or ((not slack_status_text is None) and (len(slack_status_text) > 0)):
         return f'Retrieved Slack Status:' \
             f'<br/><br/>' \
-            f'{slack_status_text}' \
-            '<br/><br/><a href="/">Return</a>'
+            f"{slack_status_emoji}" \
+            f'<br/>' \
+            f"{slack_status_text}" \
+            '<br/><br/>' \
+            f"{saved_status}" \
+            '<a href="/">Return</a>'
     return 'No Slack status currently set.' \
         '<br/><br/><a href="/">Return</a>'
 
@@ -211,37 +243,67 @@ def get_slack_status_text():
 @app.route('/set_slack_status_text')
 def set_slack_status_text():
     client = WebClient(token=session['SLACK_USER_TOKEN'])
+
+    # save original Slack status
+    response = client.users_profile_get()
+    assert response["ok"]
+    current_emoji = response.get('profile').get('status_emoji')
+    current_text = response.get('profile').get('status_text')
+    if (not current_emoji == ':musical_note:') and (not current_emoji == ':double_vertical_bar:'):
+        session['slack_status_emoji'] = current_emoji
+        session['slack_status_text'] = current_text
+    saved_status = get_saved_status()
+
+    # find spotify track
     track = get_current_track()
     if not track is None:
         artist_title = f"{track['item']['artists'][0]['name']} - {track['item']['name']}"
-        if (not artist_title is None) and (len(artist_title) > 0) and (track['is_playing']):
+        if (not artist_title is None) and (len(artist_title) > 0):
+            # set emoji as paused or playing
+            slack_emoji = ':double_vertical_bar:'
+            if track['is_playing']:
+                slack_emoji = ':musical_note:'
             response = client.users_profile_set(
                 profile={
+                    'status_emoji': slack_emoji,
                     'status_text': artist_title,
-                    'status_emoji': ':musical_note:',
                 }
             )
             assert response["ok"]
+            slack_status_emoji = response.get('profile').get('status_emoji')
             slack_status_text = response.get('profile').get('status_text')
             if (not slack_status_text is None) and (len(slack_status_text) > 0):
                 return f'Wrote Slack Status:' \
                     f'<br/><br/>' \
+                    f'{slack_status_emoji}' \
+                    f'<br/>' \
                     f'{slack_status_text}' \
-                    '<br/><br/><a href="/">Return</a>'
-        else:
-            # clear if paused
-            response = client.users_profile_set(
-                profile={
-                    'status_text': '',
-                    'status_emoji': '',
-                }
-            )
-            assert response["ok"]
-            return 'Track may be paused. Cleared Slack status.' \
+                    f'<br/><br/>' \
+                    f"{saved_status}" \
+                    '<a href="/">Return</a>'
+            return f'Error writing Slack Status.' \
                 '<br/><br/><a href="/">Return</a>'
-    # don't clear status if no track was playing AND not paused
-    return 'No track currently playing. Not changing Slack status.' \
-        '<br/><br/><a href="/">Return</a>'
+        return f'Error fetching current track. Not writing Slack Status.' \
+            '<br/><br/><a href="/">Return</a>'
+    else:
+        # reset back to original
+        original_status_emoji = session.get('slack_status_emoji')
+        original_status_text = session.get('slack_status_text')
+        if original_status_emoji is None:
+            original_status_emoji = ''
+        if original_status_text is None:
+            original_status_text = ''
+        response = client.users_profile_set(
+            profile={
+                'status_emoji': original_status_emoji,
+                'status_text': original_status_text,
+            }
+        )
+        assert response["ok"]
+        return 'No track currently playing. Restoring Slack status.' \
+            f'<br/><br/>' \
+            f"{saved_status}" \
+            '<a href="/">Return</a>'
 
 
 '''
