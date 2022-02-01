@@ -2,3 +2,4 @@ spotipy>=2.19.0
 Flask>=2.0.2
 Flask-Session>=0.4.0
 slack_sdk>=3.13.0
+flask-dynamodb-sessions>=0.1.8
