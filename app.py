@@ -34,7 +34,7 @@ Run app.py
 from slack_sdk import WebClient
 import os
 from flask import Flask, session, request, redirect
-from flask_session import Session
+from flask_dynamodb_sessions import Session
 import spotipy
 import uuid
 sss_uri = os.environ["SPOTIPY_REDIRECT_URI"]
