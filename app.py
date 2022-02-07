@@ -33,15 +33,16 @@ Run app.py
 
 from slack_sdk import WebClient
 import os
-from flask import Flask, session, request, redirect
+from flask import Flask, request, redirect
+import flask.sessions
 from flask_dynamodb_sessions import Session
 import spotipy
 import uuid
 import boto3
 sss_uri = os.environ["SPOTIPY_REDIRECT_URI"]
 
-session = boto3.session.Session()
-ssm_client = client = session.client(
+ssm_session = boto3.session.Session()
+ssm_client = client = ssm_session.client(
     service_name='ssm',
     region_name=os.environ["AWS_REGION"],
 )
@@ -56,26 +57,34 @@ slack_client_secret = os.environ["SLACK_CLIENT_SECRET"]
 slack_oauth_scope = 'users.profile%3Awrite%2Cusers.profile%3Aread'
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.urandom(64)
-app.config['SESSION_TYPE'] = 'filesystem'
-app.config['SESSION_FILE_DIR'] = './.flask_session/'
+# app.config['SECRET_KEY'] = os.urandom(64)
+app.config.update(
+    SESSION_DYNAMODB_TABLE=os.environ['SESSION_DYNAMODB_TABLE'],
+    SESSION_DYNAMODB_REGION=os.environ.get('SESSION_DYNAMODB_REGION',
+        os.environ.get('AWS_REGION', 'ca-central-1')
+    ),
+    SESSION_DYNAMODB_TTL_SECONDS=os.environ.get('SESSION_DYNAMODB_TTL_SECONDS', 86400 * 7)
+)
 Session(app)
 
 
 @app.route('/')
 def index():
-    if not session.get('uuid'):
+    if not flask.session.get('uuid'):
         # Step 1. Visitor is unknown, give random ID
-        session['uuid'] = str(uuid.uuid4())
+        flask.session['uuid'] = str(uuid.uuid4())
 
-    cache_handler = spotipy.cache_handler.SessionCacheHandler()
+    cache_handler = spotipy.cache_handler.DjangoSessionCacheHandler(flask)
     auth_manager = spotipy.oauth2.SpotifyOAuth(scope='user-read-currently-playing',
                                                cache_handler=cache_handler,
                                                show_dialog=True)
 
     if request.args.get("code"):
         # Step 3. Being redirected from Spotify auth page
-        auth_manager.get_access_token(request.args.get("code"))
+        auth_manager.get_access_token(
+            code=request.args.get("code"),
+            as_dict=False,
+        )
         return redirect('/')
 
     if not auth_manager.validate_token(cache_handler.get_cached_token()):
@@ -92,9 +101,10 @@ def index():
     # Step 4. Signed in, display data
     spotify = spotipy.Spotify(auth_manager=auth_manager)
 
-    session['state'] = str(uuid.uuid4())
+    flask.session['state'] = str(uuid.uuid4())
+
     slack_login_button = '<a href="https://slack.com/oauth/v2/authorize?' \
-        f'user_scope={slack_oauth_scope}&redirect_uri={sss_uri}/slack/oauth_redirect&client_id={slack_client_id}&state={session["state"]}" ' \
+        f'user_scope={slack_oauth_scope}&redirect_uri={sss_uri}/slack/oauth_redirect&client_id={slack_client_id}&state={flask.session["state"]}" ' \
         'style="align-items:center;color:#fff;background-color:#4A154B;border:0;border-radius:56px;display:inline-flex;' \
         'font-family:Lato, sans-serif;font-size:18px;font-weight:600;height:56px;justify-content:center;text-decoration:none;width:276px">' \
         '<svg xmlns="http://www.w3.org/2000/svg" style="height:24px;width:24px;margin-right:12px" viewBox="0 0 122.8 122.8"><path d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9zm6.5 0c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z" fill="#e01e5a"></path><path d="M45.2 25.8c-7.1 0-12.9-5.8-12.9-12.9S38.1 0 45.2 0s12.9 5.8 12.9 12.9v12.9H45.2zm0 6.5c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H12.9C5.8 58.1 0 52.3 0 45.2s5.8-12.9 12.9-12.9h32.3z" fill="#36c5f0"></path><path d="M97 45.2c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.9 12.9H97V45.2zm-6.5 0c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V12.9C64.7 5.8 70.5 0 77.6 0s12.9 5.8 12.9 12.9v32.3z" fill="#2eb67d"></path><path d="M77.6 97c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9-12.9-5.8-12.9-12.9V97h12.9zm0-6.5c-7.1 0-12.9-5.8-12.9-12.9s5.8-12.9 12.9-12.9h32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H77.6z" fill="#ecb22e"></path></svg>' \
@@ -103,10 +113,10 @@ def index():
         f'<br/><br/>' \
         f'<a href="/set_slack_status_text">set_slack_status_text</a>'
     show_slack_button = ''
-    if session.get('SLACK_USER_TOKEN') is None:
+    if flask.session.get('SLACK_USER_TOKEN') is None:
         show_slack_button = slack_login_button
     else:
-        client = WebClient(token=session['SLACK_USER_TOKEN'])
+        client = WebClient(token=flask.session['SLACK_USER_TOKEN'])
         response = client.users_profile_get()
         if not response["ok"]:
             show_slack_button = slack_login_button
@@ -126,14 +136,14 @@ def index():
 @app.route('/sign_out')
 def sign_out():
     try:
-        session.clear()
+        flask.session.clear()
     except OSError as e:
         print("Error: %s - %s." % (e.filename, e.strerror))
     return redirect('/')
 
 
 def get_current_track():
-    cache_handler = spotipy.cache_handler.SessionCacheHandler()
+    cache_handler = spotipy.cache_handler.DjangoSessionCacheHandler(flask)
     auth_manager = spotipy.oauth2.SpotifyOAuth(cache_handler=cache_handler)
     if not auth_manager.validate_token(cache_handler.get_cached_token()):
         return redirect('/')
@@ -154,7 +164,7 @@ def currently_playing():
 
 @app.route('/current_user')
 def current_user():
-    cache_handler = spotipy.cache_handler.SessionCacheHandler()
+    cache_handler = spotipy.cache_handler.DjangoSessionCacheHandler(flask)
     auth_manager = spotipy.oauth2.SpotifyOAuth(cache_handler=cache_handler)
     if not auth_manager.validate_token(cache_handler.get_cached_token()):
         return redirect('/')
@@ -170,7 +180,7 @@ def post_install():
     Slack redirect to get the User Scoped Token
     """
     # Verify the "state" parameter
-    assert session['state'] == request.args['state']
+    assert flask.session['state'] == request.args['state']
 
     # Retrieve the auth code from the request params
     code_param = request.args.get('code')
@@ -191,10 +201,10 @@ def post_install():
                 '<br/><br/><a href="/">Return</a>'
         # Save the bot token to an environmental variable or to your data store
         # for later use
-        session["SLACK_USER_TOKEN"] = response.get(
+        flask.session["SLACK_USER_TOKEN"] = response.get(
             'authed_user').get('access_token')
 
-        if not session["SLACK_USER_TOKEN"] is None:
+        if not flask.session["SLACK_USER_TOKEN"] is None:
             # Don't forget to let the user know that OAuth has succeeded!
             return 'SpotifySlackStatus app successfully installed to Slack!' \
                 '<br/><br/><a href="/">Return</a>'
@@ -203,8 +213,8 @@ def post_install():
 
 
 def get_saved_status():
-    original_status_emoji = session.get('slack_status_emoji')
-    original_status_text = session.get('slack_status_text')
+    original_status_emoji = flask.session.get('slack_status_emoji')
+    original_status_text = flask.session.get('slack_status_text')
     saved_status = ''
     if (not original_status_emoji is None) or (not original_status_text is None):
         if original_status_emoji is None:
@@ -222,7 +232,7 @@ def get_saved_status():
 
 @app.route('/get_slack_status_text')
 def get_slack_status_text():
-    client = WebClient(token=session['SLACK_USER_TOKEN'])
+    client = WebClient(token=flask.session['SLACK_USER_TOKEN'])
     response = client.users_profile_get()
     assert response["ok"]
     slack_status_emoji = response.get('profile').get('status_emoji')
@@ -244,7 +254,7 @@ def get_slack_status_text():
 
 @app.route('/set_slack_status_text')
 def set_slack_status_text():
-    client = WebClient(token=session['SLACK_USER_TOKEN'])
+    client = WebClient(token=flask.session['SLACK_USER_TOKEN'])
 
     # save original Slack status
     response = client.users_profile_get()
@@ -252,8 +262,8 @@ def set_slack_status_text():
     current_emoji = response.get('profile').get('status_emoji')
     current_text = response.get('profile').get('status_text')
     if (not current_emoji == ':musical_note:') and (not current_emoji == ':double_vertical_bar:'):
-        session['slack_status_emoji'] = current_emoji
-        session['slack_status_text'] = current_text
+        flask.session['slack_status_emoji'] = current_emoji
+        flask.session['slack_status_text'] = current_text
     saved_status = get_saved_status()
 
     # find spotify track
@@ -289,8 +299,8 @@ def set_slack_status_text():
             '<br/><br/><a href="/">Return</a>'
     else:
         # reset back to original
-        original_status_emoji = session.get('slack_status_emoji')
-        original_status_text = session.get('slack_status_text')
+        original_status_emoji = flask.session.get('slack_status_emoji')
+        original_status_text = flask.session.get('slack_status_text')
         if original_status_emoji is None:
             original_status_emoji = ''
         if original_status_text is None:
