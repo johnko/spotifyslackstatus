@@ -12,9 +12,6 @@ Prerequisites
     pip3 install spotipy Flask Flask-Session
 
     // from your [app settings](https://developer.spotify.com/dashboard/applications)
-    export SPOTIFY_CLIENT_ID=client_id_here
-    export SPOTIPY_CLIENT_SECRET=client_secret_here
-    export SPOTIPY_REDIRECT_URI='http://127.0.0.1:8080' // must contain a port
     // SPOTIPY_REDIRECT_URI must be added to your [app settings](https://developer.spotify.com/dashboard/applications)
     OPTIONAL
     // in development environment for debug output
@@ -39,7 +36,6 @@ from flask_dynamodb_sessions import Session
 import spotipy
 import uuid
 import boto3
-sss_uri = os.environ["SPOTIPY_REDIRECT_URI"]
 
 ssm_session = boto3.session.Session()
 ssm_client = client = ssm_session.client(
@@ -47,22 +43,27 @@ ssm_client = client = ssm_session.client(
     region_name=os.environ["AWS_REGION"],
 )
 
-os.environ['SPOTIPY_CLIENT_ID']     = ssm_client.get_parameter(Name='SPOTIFY_CLIENT_ID', WithDecryption=False).get('Parameter').get('Value')
-os.environ['SPOTIPY_CLIENT_SECRET'] = ssm_client.get_parameter(Name='SPOTIFY_CLIENT_SECRET', WithDecryption=True).get('Parameter').get('Value')
-os.environ['SLACK_CLIENT_ID']     = ssm_client.get_parameter(Name='SLACK_CLIENT_ID', WithDecryption=False).get('Parameter').get('Value')
-os.environ['SLACK_CLIENT_SECRET'] = ssm_client.get_parameter(Name='SLACK_CLIENT_SECRET', WithDecryption=True).get('Parameter').get('Value')
-
-slack_client_id = os.environ["SLACK_CLIENT_ID"]
-slack_client_secret = os.environ["SLACK_CLIENT_SECRET"]
+sss_uri = ssm_client.get_parameter(
+    Name='SPOTIFY_REDIRECT_URI', WithDecryption=False).get('Parameter').get('Value')
+spotify_client_id = ssm_client.get_parameter(
+    Name='SPOTIFY_CLIENT_ID', WithDecryption=False).get('Parameter').get('Value')
+spotify_client_secret = ssm_client.get_parameter(
+    Name='SPOTIFY_CLIENT_SECRET', WithDecryption=True).get('Parameter').get('Value')
+slack_client_id = ssm_client.get_parameter(
+    Name='SLACK_CLIENT_ID', WithDecryption=False).get('Parameter').get('Value')
+slack_client_secret = ssm_client.get_parameter(
+    Name='SLACK_CLIENT_SECRET', WithDecryption=True).get('Parameter').get('Value')
 slack_oauth_scope = 'users.profile%3Awrite%2Cusers.profile%3Aread'
 
 app = Flask(__name__)
 app.config.update(
     SESSION_DYNAMODB_TABLE=os.environ['SESSION_DYNAMODB_TABLE'],
     SESSION_DYNAMODB_REGION=os.environ.get('SESSION_DYNAMODB_REGION',
-        os.environ.get('AWS_REGION', 'ca-central-1')
-    ),
-    SESSION_DYNAMODB_TTL_SECONDS=os.environ.get('SESSION_DYNAMODB_TTL_SECONDS', 86400 * 7)
+                                           os.environ.get(
+                                               'AWS_REGION', 'ca-central-1')
+                                           ),
+    SESSION_DYNAMODB_TTL_SECONDS=os.environ.get(
+        'SESSION_DYNAMODB_TTL_SECONDS', 86400 * 7)
 )
 Session(app)
 
@@ -74,9 +75,14 @@ def index():
         flask.session['uuid'] = str(uuid.uuid4())
 
     cache_handler = spotipy.cache_handler.DjangoSessionCacheHandler(flask)
-    auth_manager = spotipy.oauth2.SpotifyOAuth(scope='user-read-currently-playing',
-                                               cache_handler=cache_handler,
-                                               show_dialog=True)
+    auth_manager = spotipy.oauth2.SpotifyOAuth(
+        client_id=spotify_client_id,
+        client_secret=spotify_client_secret,
+        scope='user-read-currently-playing',
+        cache_handler=cache_handler,
+        redirect_uri=sss_uri,
+        show_dialog=True,
+    )
 
     if request.args.get("code"):
         # Step 3. Being redirected from Spotify auth page
@@ -143,7 +149,12 @@ def sign_out():
 
 def get_current_track():
     cache_handler = spotipy.cache_handler.DjangoSessionCacheHandler(flask)
-    auth_manager = spotipy.oauth2.SpotifyOAuth(cache_handler=cache_handler)
+    auth_manager = spotipy.oauth2.SpotifyOAuth(
+        client_id=spotify_client_id,
+        client_secret=spotify_client_secret,
+        cache_handler=cache_handler,
+        redirect_uri=sss_uri,
+    )
     if not auth_manager.validate_token(cache_handler.get_cached_token()):
         return redirect('/')
     spotify = spotipy.Spotify(auth_manager=auth_manager)
@@ -164,7 +175,12 @@ def currently_playing():
 @app.route('/current_user')
 def current_user():
     cache_handler = spotipy.cache_handler.DjangoSessionCacheHandler(flask)
-    auth_manager = spotipy.oauth2.SpotifyOAuth(cache_handler=cache_handler)
+    auth_manager = spotipy.oauth2.SpotifyOAuth(
+        client_id=spotify_client_id,
+        client_secret=spotify_client_secret,
+        cache_handler=cache_handler,
+        redirect_uri=sss_uri,
+    )
     if not auth_manager.validate_token(cache_handler.get_cached_token()):
         return redirect('/')
     spotify = spotipy.Spotify(auth_manager=auth_manager)
@@ -323,5 +339,7 @@ Following lines allow application to be run more conveniently with
 (Also includes directive to leverage pythons threading capacity.)
 '''
 if __name__ == '__main__':
+    if not sss_uri is None:
+        os.environ['SPOTIPY_REDIRECT_URI'] = sss_uri
     app.run(threaded=True, port=int(os.environ.get("PORT",
                                                    os.environ.get("SPOTIPY_REDIRECT_URI", 8080).split(":")[-1])))
