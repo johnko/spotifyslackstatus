@@ -57,7 +57,6 @@ slack_client_secret = os.environ["SLACK_CLIENT_SECRET"]
 slack_oauth_scope = 'users.profile%3Awrite%2Cusers.profile%3Aread'
 
 app = Flask(__name__)
-# app.config['SECRET_KEY'] = os.urandom(64)
 app.config.update(
     SESSION_DYNAMODB_TABLE=os.environ['SESSION_DYNAMODB_TABLE'],
     SESSION_DYNAMODB_REGION=os.environ.get('SESSION_DYNAMODB_REGION',
